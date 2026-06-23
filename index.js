@@ -3,11 +3,45 @@ const cors = require("cors");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
+const admin = require("firebase-admin");
 const port = process.env.PORT || 3000;
+
+const serviceAccount = require("./smart-deals-1be82-firebase-adminkey.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 // middleware
 app.use(cors());
 app.use(express.json());
+const logger = (req, res, next) => {
+  console.log("logging info");
+  next();
+};
+
+const verifyFirebaseToken = async (req, res, next) => {
+  if (!req.headers.authorization) {
+    return res.status(401).send("Unauthorized access: No token provided");
+  }
+  const token = req.headers.authorization.split(" ")[1];
+  if (!token) {
+    return res.status(401).send("Unauthorized access: No token provided");
+  }
+  // verify firebase token
+
+  try {
+    const userInfo = await admin.auth().verifyIdToken(token);
+    req.token_email = userInfo.email;
+    // console.log("after token validation", userInfo);
+    next();
+  } catch (error) {
+    console.error("Firebase Auth Error:", error.message);
+    return res
+      .status(401)
+      .send({ message: "Unauthorized access: Invalid token" });
+  }
+};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jd5uu0i.mongodb.net/?appName=Cluster0`;
 
@@ -59,7 +93,7 @@ async function run() {
       //   .limit(5)
       //   .project(projectFields);
 
-      console.log(req.query);
+      // console.log(req.query);
       const email = req.query.email;
       const query = {};
       if (email) {
@@ -126,7 +160,7 @@ async function run() {
     //   res.send(result);
     // });
 
-    app.get("/products/bids/:productId", async (req, res) => {
+    app.get("/products/bids/:productId", verifyFirebaseToken, async (req, res) => {
       const productId = req.params.productId;
       const query = { product: productId };
       const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
@@ -144,32 +178,72 @@ async function run() {
     //   res.send(result);
     // });
 
-    app.get("/bids", async (req, res) => {
-      const email = req.query.email;
-      const query = email ? { buyer_email: email } : {};
+    // app.get("/bids", logger, verifyFirebaseToken, async (req, res) => {
+    //   // console.log(req.headers);
+    //   const email = req.query.email;
+    //   const query = email ? { buyer_email: email } : {};
 
-      const result = await bidsCollection
-        .aggregate([
-          { $match: query },
-          {
-            $addFields: {
-              // Convert the string product ID to an ObjectId for the lookup
-              productObjectId: { $toObjectId: "$product" },
-            },
-          },
-          {
-            $lookup: {
-              from: "products",
-              localField: "productObjectId", // Use the converted field
-              foreignField: "_id",
-              as: "productDetails",
-            },
-          },
-          { $unwind: "$productDetails" },
-        ])
-        .toArray();
+    //   const result = await bidsCollection
+    //     .aggregate([
+    //       { $match: query },
+    //       {
+    //         $addFields: {
+    //           // Convert the string product ID to an ObjectId for the lookup
+    //           productObjectId: { $toObjectId: "$product" },
+    //         },
+    //       },
+    //       {
+    //         $lookup: {
+    //           from: "products",
+    //           localField: "productObjectId", // Use the converted field
+    //           foreignField: "_id",
+    //           as: "productDetails",
+    //         },
+    //       },
+    //       { $unwind: "$productDetails" },
+    //     ])
+    //     .toArray();
 
-      res.send(result);
+    //   res.send(result);
+    // });
+
+    app.get("/bids", logger, verifyFirebaseToken, async (req, res) => {
+      // console.log("after bid", req);
+      try {
+        const email = req.query.email;
+        const query = email ? { buyer_email: email } : {};
+        if(email !== req.token_email) {
+          return res.status(403).send("Forbidden Access");
+        }
+
+        const result = await bidsCollection
+          .aggregate([
+            { $match: query },
+            {
+              $addFields: {
+                // Convert the string product ID to an ObjectId for the lookup
+                productObjectId: { $toObjectId: "$product" },
+              },
+            },
+            {
+              $lookup: {
+                from: "products",
+                localField: "productObjectId", // Use the converted field
+                foreignField: "_id",
+                as: "productDetails",
+              },
+            },
+            { $unwind: "$productDetails" },
+          ])
+          .toArray();
+
+        // Add 'return' to ensure the function stops here after sending
+        return res.send(result);
+      } catch (error) {
+        console.error(error);
+        // Use 'return' here too so this doesn't fall through to another res.send
+        return res.status(500).send({ message: "Internal server error" });
+      }
     });
 
     app.post("/bids", async (req, res) => {
