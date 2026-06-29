@@ -105,6 +105,7 @@ async function run() {
       res.send({ token: token });
     });
 
+
     // USERS APIs
     app.post("/users", async (req, res) => {
       const newUser = req.body;
@@ -121,6 +122,7 @@ async function run() {
         res.send(result);
       }
     });
+
 
     // PRODUCTS APIs
     app.get("/products", async (req, res) => {
@@ -160,8 +162,17 @@ async function run() {
       res.send(result);
     });
 
+    // app.post("/products", async (req, res) => {
+    //   const newProduct = req.body;
+    //   const result = await productsCollection.insertOne(newProduct);
+    //   res.send(result);
+    // });
+
     app.post("/products", async (req, res) => {
-      const newProduct = req.body;
+      const newProduct = {
+        ...req.body,
+        created_at: new Date(),
+      };
       const result = await productsCollection.insertOne(newProduct);
       res.send(result);
     });
@@ -187,6 +198,7 @@ async function run() {
       res.send(result);
     });
 
+    
     // bids related api
     // app.get("/bids", async (req, res) => {
     //   const email = req.query.email;
@@ -199,17 +211,13 @@ async function run() {
     //   res.send(result);
     // });
 
-    app.get(
-      "/products/bids/:productId",
-      verifyFirebaseToken,
-      async (req, res) => {
-        const productId = req.params.productId;
-        const query = { product: productId };
-        const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
-        const result = await cursor.toArray();
-        res.send(result);
-      },
-    );
+    app.get("/products/bids/:productId", async (req, res) => {
+      const productId = req.params.productId;
+      const query = { product: productId };
+      const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
     app.get("/bids", verifyJWTToken, async (req, res) => {
       const email = req.query.email;
