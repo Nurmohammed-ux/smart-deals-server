@@ -381,9 +381,10 @@ async function run() {
 }
 run().catch(console.dir);
 
-app.listen(port, (req, res) => {
-  console.log(`Smart deals listening on port ${port}`);
-});
+// app.listen(port, (req, res) => {
+//   console.log(`Smart deals listening on port ${port}`);
+// });
+module.exports = app;
 
 // client
 //   .connect()
