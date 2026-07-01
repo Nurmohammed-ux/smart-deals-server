@@ -1,3 +1,4 @@
 node_modules
 .env
 smart-deals-1be82-firebase-adminkey.json
+.vercel
