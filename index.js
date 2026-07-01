@@ -105,7 +105,6 @@ async function run() {
       res.send({ token: token });
     });
 
-
     // USERS APIs
     app.post("/users", async (req, res) => {
       const newUser = req.body;
@@ -122,7 +121,6 @@ async function run() {
         res.send(result);
       }
     });
-
 
     // PRODUCTS APIs
     app.get("/products", async (req, res) => {
@@ -162,13 +160,7 @@ async function run() {
       res.send(result);
     });
 
-    // app.post("/products", async (req, res) => {
-    //   const newProduct = req.body;
-    //   const result = await productsCollection.insertOne(newProduct);
-    //   res.send(result);
-    // });
-
-    app.post("/products", async (req, res) => {
+    app.post("/products", verifyFirebaseToken, async (req, res) => {
       const newProduct = {
         ...req.body,
         created_at: new Date(),
@@ -176,6 +168,16 @@ async function run() {
       const result = await productsCollection.insertOne(newProduct);
       res.send(result);
     });
+
+    // app.post("/products", verifyJWTToken, async (req, res) => {
+    //   // console.log("from backend", req.headers);
+    //   const newProduct = {
+    //     ...req.body,
+    //     created_at: new Date(),
+    //   };
+    //   const result = await productsCollection.insertOne(newProduct);
+    //   res.send(result);
+    // });
 
     app.patch("/products/:id", async (req, res) => {
       const id = req.params.id;
@@ -198,7 +200,6 @@ async function run() {
       res.send(result);
     });
 
-    
     // bids related api
     // app.get("/bids", async (req, res) => {
     //   const email = req.query.email;
@@ -219,7 +220,41 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/bids", verifyJWTToken, async (req, res) => {
+    // app.get("/bids", verifyJWTToken, async (req, res) => {
+    //   const email = req.query.email;
+    //   const query = {};
+    //   if (email) {
+    //     query.buyer_email = email;
+    //   }
+
+    //   // verify user have access to see this data
+    //   if (email !== req.token_email) {
+    //     return res.status(403).send({ message: "Forbidden access" });
+    //   }
+    //   const result = await bidsCollection
+    //     .aggregate([
+    //       { $match: query },
+    //       {
+    //         $addFields: {
+    //           // Convert the string product ID to an ObjectId for the lookup
+    //           productObjectId: { $toObjectId: "$product" },
+    //         },
+    //       },
+    //       {
+    //         $lookup: {
+    //           from: "products",
+    //           localField: "productObjectId", // Use the converted field
+    //           foreignField: "_id",
+    //           as: "productDetails",
+    //         },
+    //       },
+    //       { $unwind: "$productDetails" },
+    //     ])
+    //     .toArray();
+    //   res.send(result);
+    // });
+
+    app.get("/bids", verifyFirebaseToken, async (req, res) => {
       const email = req.query.email;
       const query = {};
       if (email) {
