@@ -94,6 +94,29 @@ app.get("/", (req, res) => {
   res.send("Smart deals server is running");
 });
 
+client
+  .connect()
+  .then(() => {
+    console.log("MongoDB connected");
+  })
+  .catch(console.error);
+
+// Register routes immediately
+app.get("/latest-products", async (req, res) => {
+  try {
+    const result = await productsCollection
+      .find()
+      .sort({ created_at: -1 })
+      .limit(6)
+      .toArray();
+
+    res.send(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
 async function run() {
   try {
     await client.connect();
@@ -164,10 +187,10 @@ async function run() {
     //   res.send(result);
     // });
 
-    app.get("/latest-products", async (req, res) => {
-      console.log("latest-products hit");
-      res.send("latest-products works");
-    });
+    // app.get("/latest-products", async (req, res) => {
+    //   console.log("latest-products hit");
+    //   res.send("latest-products works");
+    // });
 
     app.get("/products/:id", async (req, res) => {
       const id = req.params.id;
@@ -399,11 +422,12 @@ async function run() {
 app.get("/hello", (req, res) => {
   res.send("Hello");
 });
-run().catch(console.dir);
+// run().catch(console.dir);
 
 // app.listen(port, (req, res) => {
 //   console.log(`Smart deals listening on port ${port}`);
 // });
+client.connect().catch(console.error);
 module.exports = app;
 
 // client
