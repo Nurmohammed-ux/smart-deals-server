@@ -13,6 +13,8 @@ const decoded = Buffer.from(
 ).toString("utf8");
 const serviceAccount = JSON.parse(decoded);
 // const serviceAccount = require("./smart-deals-1be82-firebase-adminkey.json");
+console.log("Firebase key exists:", !!process.env.FIREBASE_SERVICE_KEY);
+console.log("Decoded length:", decoded.length);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -149,13 +151,18 @@ async function run() {
       res.send(result);
     });
 
+    // app.get("/latest-products", async (req, res) => {
+    //   const cursor = productsCollection
+    //     .find()
+    //     .sort({ created_at: -1 })
+    //     .limit(6);
+    //   const result = await cursor.toArray();
+    //   res.send(result);
+    // });
+
     app.get("/latest-products", async (req, res) => {
-      const cursor = productsCollection
-        .find()
-        .sort({ created_at: -1 })
-        .limit(6);
-      const result = await cursor.toArray();
-      res.send(result);
+      console.log("latest-products hit");
+      res.send("latest-products works");
     });
 
     app.get("/products/:id", async (req, res) => {
@@ -384,6 +391,10 @@ async function run() {
   } finally {
   }
 }
+
+app.get("/hello", (req, res) => {
+  res.send("Hello");
+});
 run().catch(console.dir);
 
 // app.listen(port, (req, res) => {
