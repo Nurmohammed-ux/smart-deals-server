@@ -7,7 +7,10 @@ const app = express();
 const admin = require("firebase-admin");
 const port = process.env.PORT || 3000;
 
-const decoded = Buffer.from(process.env.FIREBASE_SERVICE_KEY, "base64").toString("utf8");
+const decoded = Buffer.from(
+  process.env.FIREBASE_SERVICE_KEY,
+  "base64",
+).toString("utf8");
 const serviceAccount = JSON.parse(decoded);
 // const serviceAccount = require("./smart-deals-1be82-firebase-adminkey.json");
 
@@ -376,6 +379,8 @@ async function run() {
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!",
     );
+  } catch (err) {
+    console.error(err);
   } finally {
   }
 }
