@@ -134,7 +134,7 @@ app.get("/latest-products", async (req, res) => {
 
     const result = await productsCollection
       .find()
-      .limit(1)
+      .limit(6)
       .toArray();
 
     res.send(result);
