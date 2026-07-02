@@ -126,16 +126,24 @@ app.get("/products", async (req, res) => {
 // Get latest 6 products
 app.get("/latest-products", async (req, res) => {
   try {
+    console.log("Connecting...");
+
+    await client.connect();
+
+    console.log("Connected");
+
     const result = await productsCollection
       .find()
-      .sort({ created_at: -1 })
-      .limit(6)
+      .limit(1)
       .toArray();
 
     res.send(result);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({ message: error.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({
+      message: err.message,
+      stack: err.stack,
+    });
   }
 });
 
