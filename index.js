@@ -13,8 +13,6 @@ const decoded = Buffer.from(
 ).toString("utf8");
 const serviceAccount = JSON.parse(decoded);
 // const serviceAccount = require("./smart-deals-1be82-firebase-adminkey.json");
-console.log("Firebase key exists:", !!process.env.FIREBASE_SERVICE_KEY);
-console.log("Decoded length:", decoded.length);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -89,6 +87,11 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+
+const database = client.db("smart_db");
+const productsCollection = database.collection("products");
+const bidsCollection = database.collection("bids");
+const usersCollection = database.collection("users");
 
 app.get("/", (req, res) => {
   res.send("Smart deals server is running");
