@@ -93,10 +93,6 @@ const productsCollection = database.collection("products");
 const bidsCollection = database.collection("bids");
 const usersCollection = database.collection("users");
 
-app.get("/", (req, res) => {
-  res.send("Smart deals server is running");
-});
-
 client
   .connect()
   .then(() => {
@@ -104,7 +100,30 @@ client
   })
   .catch(console.error);
 
+app.get("/", (req, res) => {
+  res.send("Smart deals server is running");
+});
+
 // Register routes immediately
+// Get all products or products by email
+app.get("/products", async (req, res) => {
+  try {
+    const email = req.query.email;
+    const query = {};
+
+    if (email) {
+      query.email = email;
+    }
+
+    const result = await productsCollection.find(query).toArray();
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: error.message });
+  }
+});
+
+// Get latest 6 products
 app.get("/latest-products", async (req, res) => {
   try {
     const result = await productsCollection
@@ -114,323 +133,487 @@ app.get("/latest-products", async (req, res) => {
       .toArray();
 
     res.send(result);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send({ message: "Internal Server Error" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: error.message });
   }
 });
 
-async function run() {
+// Get single product
+app.get("/products/:id", async (req, res) => {
   try {
-    await client.connect();
+    const id = req.params.id;
 
-    const database = client.db("smart_db");
-    const productsCollection = database.collection("products");
-    const bidsCollection = database.collection("bids");
-    const usersCollection = database.collection("users");
-
-    // jwt related api
-    app.post("/getToken", (req, res) => {
-      const loggedUser = req.body;
-      const token = jwt.sign(loggedUser, process.env.JWT_SECRET, {
-        expiresIn: "1h",
-      });
-      res.send({ token: token });
+    const result = await productsCollection.findOne({
+      _id: new ObjectId(id),
     });
 
-    app.get("/abc123", (req, res) => {
-      res.send("ABC123");
-    });
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: error.message });
+  }
+});
 
-    // USERS APIs
-    app.post("/users", async (req, res) => {
-      const newUser = req.body;
+// Add new product
+app.post("/products", verifyFirebaseToken, async (req, res) => {
+  try {
+    const newProduct = {
+      ...req.body,
+      created_at: new Date(),
+    };
 
-      const email = req.body.email;
-      const query = { email: email };
-      const existingUser = await usersCollection.findOne(query);
-      if (existingUser) {
-        res.send({
-          message: "User already exists, do not need to insert user",
-        });
-      } else {
-        const result = await usersCollection.insertOne(newUser);
-        res.send(result);
-      }
-    });
+    const result = await productsCollection.insertOne(newProduct);
 
-    // PRODUCTS APIs
-    app.get("/products", async (req, res) => {
-      // const projectFields = { title: 1, price_min: 1, price_max:1 };
-      // const cursor = productsCollection
-      //   .find()
-      //   .sort({ price_min: 1 })
-      //   .skip(2)
-      //   .limit(5)
-      //   .project(projectFields);
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: error.message });
+  }
+});
 
-      // console.log(req.query);
-      const email = req.query.email;
-      const query = {};
-      if (email) {
-        query.email = email;
-      }
+// Update product
+app.patch("/products/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updatedProduct = req.body;
 
-      const cursor = productsCollection.find(query);
-      const result = await cursor.toArray();
-      res.send(result);
-    });
-
-    // app.get("/latest-products", async (req, res) => {
-    //   const cursor = productsCollection
-    //     .find()
-    //     .sort({ created_at: -1 })
-    //     .limit(6);
-    //   const result = await cursor.toArray();
-    //   res.send(result);
-    // });
-
-    // app.get("/latest-products", async (req, res) => {
-    //   console.log("latest-products hit");
-    //   res.send("latest-products works");
-    // });
-
-    app.get("/products/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await productsCollection.findOne(query);
-      res.send(result);
-    });
-
-    app.post("/products", verifyFirebaseToken, async (req, res) => {
-      const newProduct = {
-        ...req.body,
-        created_at: new Date(),
-      };
-      const result = await productsCollection.insertOne(newProduct);
-      res.send(result);
-    });
-
-    // app.post("/products", verifyJWTToken, async (req, res) => {
-    //   // console.log("from backend", req.headers);
-    //   const newProduct = {
-    //     ...req.body,
-    //     created_at: new Date(),
-    //   };
-    //   const result = await productsCollection.insertOne(newProduct);
-    //   res.send(result);
-    // });
-
-    app.patch("/products/:id", async (req, res) => {
-      const id = req.params.id;
-      const updatedProduct = req.body;
-      const query = { _id: new ObjectId(id) };
-      const update = {
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
         $set: {
           name: updatedProduct.name,
           price: updatedProduct.price,
         },
-      };
-      const result = await productsCollection.updateOne(query, update);
-      res.send(result);
-    });
-
-    app.delete("/products/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await productsCollection.deleteOne(query);
-      res.send(result);
-    });
-
-    // bids related api
-    // app.get("/bids", async (req, res) => {
-    //   const email = req.query.email;
-    //   const query = {};
-    //   if (email) {
-    //     query.buyer_email = email;
-    //   }
-    //   const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
-    //   const result = await cursor.toArray();
-    //   res.send(result);
-    // });
-
-    app.get("/products/bids/:productId", async (req, res) => {
-      const productId = req.params.productId;
-      const query = { product: productId };
-      const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
-      const result = await cursor.toArray();
-      res.send(result);
-    });
-
-    // app.get("/bids", verifyJWTToken, async (req, res) => {
-    //   const email = req.query.email;
-    //   const query = {};
-    //   if (email) {
-    //     query.buyer_email = email;
-    //   }
-
-    //   // verify user have access to see this data
-    //   if (email !== req.token_email) {
-    //     return res.status(403).send({ message: "Forbidden access" });
-    //   }
-    //   const result = await bidsCollection
-    //     .aggregate([
-    //       { $match: query },
-    //       {
-    //         $addFields: {
-    //           // Convert the string product ID to an ObjectId for the lookup
-    //           productObjectId: { $toObjectId: "$product" },
-    //         },
-    //       },
-    //       {
-    //         $lookup: {
-    //           from: "products",
-    //           localField: "productObjectId", // Use the converted field
-    //           foreignField: "_id",
-    //           as: "productDetails",
-    //         },
-    //       },
-    //       { $unwind: "$productDetails" },
-    //     ])
-    //     .toArray();
-    //   res.send(result);
-    // });
-
-    app.get("/bids", verifyFirebaseToken, async (req, res) => {
-      const email = req.query.email;
-      const query = {};
-      if (email) {
-        query.buyer_email = email;
-      }
-
-      // verify user have access to see this data
-      if (email !== req.token_email) {
-        return res.status(403).send({ message: "Forbidden access" });
-      }
-      const result = await bidsCollection
-        .aggregate([
-          { $match: query },
-          {
-            $addFields: {
-              // Convert the string product ID to an ObjectId for the lookup
-              productObjectId: { $toObjectId: "$product" },
-            },
-          },
-          {
-            $lookup: {
-              from: "products",
-              localField: "productObjectId", // Use the converted field
-              foreignField: "_id",
-              as: "productDetails",
-            },
-          },
-          { $unwind: "$productDetails" },
-        ])
-        .toArray();
-      res.send(result);
-    });
-
-    // app.get("/bids", logger, verifyFirebaseToken, async (req, res) => {
-    //   // console.log(req.headers);
-    //   const email = req.query.email;
-    //   const query = email ? { buyer_email: email } : {};
-
-    //   const result = await bidsCollection
-    //     .aggregate([
-    //       { $match: query },
-    //       {
-    //         $addFields: {
-    //           // Convert the string product ID to an ObjectId for the lookup
-    //           productObjectId: { $toObjectId: "$product" },
-    //         },
-    //       },
-    //       {
-    //         $lookup: {
-    //           from: "products",
-    //           localField: "productObjectId", // Use the converted field
-    //           foreignField: "_id",
-    //           as: "productDetails",
-    //         },
-    //       },
-    //       { $unwind: "$productDetails" },
-    //     ])
-    //     .toArray();
-
-    //   res.send(result);
-    // });
-
-    // bids api with firebase token
-    // app.get("/bids", logger, verifyFirebaseToken, async (req, res) => {
-    //   // console.log("after bid", req);
-    //   try {
-    //     const email = req.query.email;
-    //     const query = email ? { buyer_email: email } : {};
-    //     if (email !== req.token_email) {
-    //       return res.status(403).send("Forbidden Access");
-    //     }
-
-    //     const result = await bidsCollection
-    //       .aggregate([
-    //         { $match: query },
-    //         {
-    //           $addFields: {
-    //             // Convert the string product ID to an ObjectId for the lookup
-    //             productObjectId: { $toObjectId: "$product" },
-    //           },
-    //         },
-    //         {
-    //           $lookup: {
-    //             from: "products",
-    //             localField: "productObjectId", // Use the converted field
-    //             foreignField: "_id",
-    //             as: "productDetails",
-    //           },
-    //         },
-    //         { $unwind: "$productDetails" },
-    //       ])
-    //       .toArray();
-
-    //     // Add 'return' to ensure the function stops here after sending
-    //     return res.send(result);
-    //   } catch (error) {
-    //     console.error(error);
-    //     // Use 'return' here too so this doesn't fall through to another res.send
-    //     return res.status(500).send({ message: "Internal server error" });
-    //   }
-    // });
-
-    app.post("/bids", async (req, res) => {
-      const newBid = req.body;
-      const result = await bidsCollection.insertOne(newBid);
-      res.send(result);
-    });
-
-    app.delete("/bids/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await bidsCollection.deleteOne(query);
-      res.send(result);
-    });
-
-    // await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!",
+      },
     );
-  } catch (err) {
-    console.error(err);
-  } finally {
-  }
-}
 
-app.get("/hello", (req, res) => {
-  res.send("Hello");
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: error.message });
+  }
 });
+
+// Delete product
+app.delete("/products/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const result = await productsCollection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: error.message });
+  }
+});
+
+// Bids related apis
+app.get("/bids", verifyFirebaseToken, async (req, res) => {
+  try {
+    const email = req.query.email;
+
+    if (email !== req.token_email) {
+      return res.status(403).send({
+        message: "Forbidden access",
+      });
+    }
+
+    const query = email ? { buyer_email: email } : {};
+
+    const result = await bidsCollection
+      .aggregate([
+        { $match: query },
+        {
+          $addFields: {
+            productObjectId: {
+              $toObjectId: "$product",
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: "products",
+            localField: "productObjectId",
+            foreignField: "_id",
+            as: "productDetails",
+          },
+        },
+        {
+          $unwind: "$productDetails",
+        },
+      ])
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({
+      message: error.message,
+    });
+  }
+});
+
+app.get("/products/bids/:productId", async (req, res) => {
+  try {
+    const productId = req.params.productId;
+
+    const result = await bidsCollection
+      .find({ product: productId })
+      .sort({ bid_price: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({
+      message: error.message,
+    });
+  }
+});
+
+app.post("/bids", async (req, res) => {
+  try {
+    const newBid = req.body;
+
+    const result = await bidsCollection.insertOne(newBid);
+
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({
+      message: error.message,
+    });
+  }
+});
+
+app.delete("/bids/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const result = await bidsCollection.deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    res.send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({
+      message: error.message,
+    });
+  }
+});
+
+// async function run() {
+//   try {
+//     await client.connect();
+
+//     const database = client.db("smart_db");
+//     const productsCollection = database.collection("products");
+//     const bidsCollection = database.collection("bids");
+//     const usersCollection = database.collection("users");
+
+//     // jwt related api
+//     app.post("/getToken", (req, res) => {
+//       const loggedUser = req.body;
+//       const token = jwt.sign(loggedUser, process.env.JWT_SECRET, {
+//         expiresIn: "1h",
+//       });
+//       res.send({ token: token });
+//     });
+
+//     app.get("/abc123", (req, res) => {
+//       res.send("ABC123");
+//     });
+
+//     // USERS APIs
+//     app.post("/users", async (req, res) => {
+//       const newUser = req.body;
+
+//       const email = req.body.email;
+//       const query = { email: email };
+//       const existingUser = await usersCollection.findOne(query);
+//       if (existingUser) {
+//         res.send({
+//           message: "User already exists, do not need to insert user",
+//         });
+//       } else {
+//         const result = await usersCollection.insertOne(newUser);
+//         res.send(result);
+//       }
+//     });
+
+//     // PRODUCTS APIs
+//     app.get("/products", async (req, res) => {
+//       // const projectFields = { title: 1, price_min: 1, price_max:1 };
+//       // const cursor = productsCollection
+//       //   .find()
+//       //   .sort({ price_min: 1 })
+//       //   .skip(2)
+//       //   .limit(5)
+//       //   .project(projectFields);
+
+//       // console.log(req.query);
+//       const email = req.query.email;
+//       const query = {};
+//       if (email) {
+//         query.email = email;
+//       }
+
+//       const cursor = productsCollection.find(query);
+//       const result = await cursor.toArray();
+//       res.send(result);
+//     });
+
+//     // app.get("/latest-products", async (req, res) => {
+//     //   const cursor = productsCollection
+//     //     .find()
+//     //     .sort({ created_at: -1 })
+//     //     .limit(6);
+//     //   const result = await cursor.toArray();
+//     //   res.send(result);
+//     // });
+
+//     // app.get("/latest-products", async (req, res) => {
+//     //   console.log("latest-products hit");
+//     //   res.send("latest-products works");
+//     // });
+
+//     app.get("/products/:id", async (req, res) => {
+//       const id = req.params.id;
+//       const query = { _id: new ObjectId(id) };
+//       const result = await productsCollection.findOne(query);
+//       res.send(result);
+//     });
+
+//     app.post("/products", verifyFirebaseToken, async (req, res) => {
+//       const newProduct = {
+//         ...req.body,
+//         created_at: new Date(),
+//       };
+//       const result = await productsCollection.insertOne(newProduct);
+//       res.send(result);
+//     });
+
+//     // app.post("/products", verifyJWTToken, async (req, res) => {
+//     //   // console.log("from backend", req.headers);
+//     //   const newProduct = {
+//     //     ...req.body,
+//     //     created_at: new Date(),
+//     //   };
+//     //   const result = await productsCollection.insertOne(newProduct);
+//     //   res.send(result);
+//     // });
+
+//     app.patch("/products/:id", async (req, res) => {
+//       const id = req.params.id;
+//       const updatedProduct = req.body;
+//       const query = { _id: new ObjectId(id) };
+//       const update = {
+//         $set: {
+//           name: updatedProduct.name,
+//           price: updatedProduct.price,
+//         },
+//       };
+//       const result = await productsCollection.updateOne(query, update);
+//       res.send(result);
+//     });
+
+//     app.delete("/products/:id", async (req, res) => {
+//       const id = req.params.id;
+//       const query = { _id: new ObjectId(id) };
+//       const result = await productsCollection.deleteOne(query);
+//       res.send(result);
+//     });
+
+//     // bids related api
+//     // app.get("/bids", async (req, res) => {
+//     //   const email = req.query.email;
+//     //   const query = {};
+//     //   if (email) {
+//     //     query.buyer_email = email;
+//     //   }
+//     //   const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
+//     //   const result = await cursor.toArray();
+//     //   res.send(result);
+//     // });
+
+//     app.get("/products/bids/:productId", async (req, res) => {
+//       const productId = req.params.productId;
+//       const query = { product: productId };
+//       const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
+//       const result = await cursor.toArray();
+//       res.send(result);
+//     });
+
+//     // app.get("/bids", verifyJWTToken, async (req, res) => {
+//     //   const email = req.query.email;
+//     //   const query = {};
+//     //   if (email) {
+//     //     query.buyer_email = email;
+//     //   }
+
+//     //   // verify user have access to see this data
+//     //   if (email !== req.token_email) {
+//     //     return res.status(403).send({ message: "Forbidden access" });
+//     //   }
+//     //   const result = await bidsCollection
+//     //     .aggregate([
+//     //       { $match: query },
+//     //       {
+//     //         $addFields: {
+//     //           // Convert the string product ID to an ObjectId for the lookup
+//     //           productObjectId: { $toObjectId: "$product" },
+//     //         },
+//     //       },
+//     //       {
+//     //         $lookup: {
+//     //           from: "products",
+//     //           localField: "productObjectId", // Use the converted field
+//     //           foreignField: "_id",
+//     //           as: "productDetails",
+//     //         },
+//     //       },
+//     //       { $unwind: "$productDetails" },
+//     //     ])
+//     //     .toArray();
+//     //   res.send(result);
+//     // });
+
+//     app.get("/bids", verifyFirebaseToken, async (req, res) => {
+//       const email = req.query.email;
+//       const query = {};
+//       if (email) {
+//         query.buyer_email = email;
+//       }
+
+//       // verify user have access to see this data
+//       if (email !== req.token_email) {
+//         return res.status(403).send({ message: "Forbidden access" });
+//       }
+//       const result = await bidsCollection
+//         .aggregate([
+//           { $match: query },
+//           {
+//             $addFields: {
+//               // Convert the string product ID to an ObjectId for the lookup
+//               productObjectId: { $toObjectId: "$product" },
+//             },
+//           },
+//           {
+//             $lookup: {
+//               from: "products",
+//               localField: "productObjectId", // Use the converted field
+//               foreignField: "_id",
+//               as: "productDetails",
+//             },
+//           },
+//           { $unwind: "$productDetails" },
+//         ])
+//         .toArray();
+//       res.send(result);
+//     });
+
+//     // app.get("/bids", logger, verifyFirebaseToken, async (req, res) => {
+//     //   // console.log(req.headers);
+//     //   const email = req.query.email;
+//     //   const query = email ? { buyer_email: email } : {};
+
+//     //   const result = await bidsCollection
+//     //     .aggregate([
+//     //       { $match: query },
+//     //       {
+//     //         $addFields: {
+//     //           // Convert the string product ID to an ObjectId for the lookup
+//     //           productObjectId: { $toObjectId: "$product" },
+//     //         },
+//     //       },
+//     //       {
+//     //         $lookup: {
+//     //           from: "products",
+//     //           localField: "productObjectId", // Use the converted field
+//     //           foreignField: "_id",
+//     //           as: "productDetails",
+//     //         },
+//     //       },
+//     //       { $unwind: "$productDetails" },
+//     //     ])
+//     //     .toArray();
+
+//     //   res.send(result);
+//     // });
+
+//     // bids api with firebase token
+//     // app.get("/bids", logger, verifyFirebaseToken, async (req, res) => {
+//     //   // console.log("after bid", req);
+//     //   try {
+//     //     const email = req.query.email;
+//     //     const query = email ? { buyer_email: email } : {};
+//     //     if (email !== req.token_email) {
+//     //       return res.status(403).send("Forbidden Access");
+//     //     }
+
+//     //     const result = await bidsCollection
+//     //       .aggregate([
+//     //         { $match: query },
+//     //         {
+//     //           $addFields: {
+//     //             // Convert the string product ID to an ObjectId for the lookup
+//     //             productObjectId: { $toObjectId: "$product" },
+//     //           },
+//     //         },
+//     //         {
+//     //           $lookup: {
+//     //             from: "products",
+//     //             localField: "productObjectId", // Use the converted field
+//     //             foreignField: "_id",
+//     //             as: "productDetails",
+//     //           },
+//     //         },
+//     //         { $unwind: "$productDetails" },
+//     //       ])
+//     //       .toArray();
+
+//     //     // Add 'return' to ensure the function stops here after sending
+//     //     return res.send(result);
+//     //   } catch (error) {
+//     //     console.error(error);
+//     //     // Use 'return' here too so this doesn't fall through to another res.send
+//     //     return res.status(500).send({ message: "Internal server error" });
+//     //   }
+//     // });
+
+//     app.post("/bids", async (req, res) => {
+//       const newBid = req.body;
+//       const result = await bidsCollection.insertOne(newBid);
+//       res.send(result);
+//     });
+
+//     app.delete("/bids/:id", async (req, res) => {
+//       const id = req.params.id;
+//       const query = { _id: new ObjectId(id) };
+//       const result = await bidsCollection.deleteOne(query);
+//       res.send(result);
+//     });
+
+//     // await client.db("admin").command({ ping: 1 });
+//     console.log(
+//       "Pinged your deployment. You successfully connected to MongoDB!",
+//     );
+//   } catch (err) {
+//     console.error(err);
+//   } finally {
+//   }
+// }
+
 // run().catch(console.dir);
 
 // app.listen(port, (req, res) => {
 //   console.log(`Smart deals listening on port ${port}`);
 // });
-client.connect().catch(console.error);
 module.exports = app;
 
 // client
