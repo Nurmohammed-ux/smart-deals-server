@@ -112,6 +112,10 @@ async function run() {
       res.send({ token: token });
     });
 
+    app.get("/abc123", (req, res) => {
+      res.send("ABC123");
+    });
+
     // USERS APIs
     app.post("/users", async (req, res) => {
       const newUser = req.body;
